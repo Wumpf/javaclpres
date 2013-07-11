@@ -81,10 +81,10 @@ static void blurImage(const std::string& imageFilename, int filterKernelSize)
 	// display images
 	tempImage1.save((imageFilename.substr(0, imageFilename.find_last_of('.')) + "_convolved.bmp").c_str());
 	CImgDisplay srcImageDisplay(tempImage1,"Blurred Image");
-/*	while (!srcImageDisplay.is_closed())
+	while (!srcImageDisplay.is_closed())
 	{
 		srcImageDisplay.wait();
-	} */
+	}
 }
 
 int main(int argc, char* argv[])

@@ -83,8 +83,9 @@ public class ImageBlurOpenCL {
 		System.out.println("Local Memory size: " + device.getLocalMemSize());
 		System.out.println("Global Memory size: " + device.getGlobalMemSize());
 		System.out.println("Global Memory Cache size: " + device.getGlobalMemCacheSize());
-		System.out.println("Max Compute units: " + device.getMaxComputeUnits());
+		System.out.println("Max Compute units: " + device.getMaxComputeUnits()); 
 		System.out.println("Max Work Group size: " + device.getMaxWorkGroupSize());
+		System.out.println("Max Image size: " + device.getImage2DMaxWidth() + "x" + device.getImage2DMaxHeight());
 	}
 
 	
