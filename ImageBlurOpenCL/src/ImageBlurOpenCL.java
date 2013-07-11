@@ -1,8 +1,13 @@
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.Scanner;
 
 import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 import com.nativelibs4java.opencl.*;
 import com.nativelibs4java.opencl.CLMem.Usage;
@@ -11,8 +16,68 @@ import com.nativelibs4java.util.*;
 import org.bridj.Pointer;
 
 public class ImageBlurOpenCL {
-
-	public static void printDeviceInfos(CLDevice device) {
+	
+	/**
+	 *  Create context - represents the entire OpenCL environment.
+	 */
+	private CLContext context;
+	
+	/**
+	 * OpenCL device used for OpenCL Kernels.
+	 */
+	private CLDevice device;
+	
+	/**
+	 * OpenCL command queue for the choosen device.
+	 */
+	private CLQueue queue;
+	
+	
+	/**
+	 * Initializes CLContext and creates command queue
+	 */
+	public ImageBlurOpenCL(int platformIndex, int deviceIndex) {
+		CLPlatform platform = JavaCL.listPlatforms()[platformIndex];
+		device = platform.listAllDevices(false)[deviceIndex];
+		context = platform.createContext(null, device);
+		queue = device.createProfilingQueue(context);
+	}
+	
+	/**
+	 * Lists all available OpenCL platforms
+	 */
+	public static void listOpenCLPlatforms() {
+		CLPlatform[] platforms = JavaCL.listPlatforms();
+		for(int i=0; i<platforms.length; ++i) {
+			System.out.println("(" + i + ") " + platforms[i].getName());
+		}
+	}
+	
+	/**
+	 * Lists all available OpenCL devices for the current platform.
+	 */
+	public static void listOpenCLDevices(int platformIndex) {
+		CLDevice[] devices = JavaCL.listPlatforms()[platformIndex].listAllDevices(true);
+		for(int i=0; i<devices.length; ++i) {
+			System.out.println("(" + i + ") " + devices[i].getName());
+		}
+	}
+	
+	/**
+	 * Chooses an OpenCL device and creates command queue.
+	 * Will create a profiling queue to make timer available.
+	 * @param index		Index of the OpenCL device to use
+	 */
+	public void chooseOpenCLDevice(int index) {
+		device = context.getDevices()[index];
+		queue = device.createProfilingQueue(context);
+	}
+	
+	
+	/**
+	 * Prints various informations of the current device to console.
+	 */
+	public void printCurrentDeviceInfos() {
 		System.out.println("Device Name: " + device.getName());
 		System.out.println("OpenCL Version: " + device.getOpenCLVersion());
 		System.out.println("Local Memory size: " + device.getLocalMemSize());
@@ -22,7 +87,14 @@ public class ImageBlurOpenCL {
 		System.out.println("Max Work Group size: " + device.getMaxWorkGroupSize());
 	}
 
-	public static BufferedImage loadImage(String filename) {
+	
+	/**
+	 * loads an image from file or resource
+	 * will first try to load from resource, from file if failed
+	 * @param filename	filename of the image to load
+	 * @return loaded image or null if not successful
+	 */
+	private BufferedImage loadImage(String filename) {
 		BufferedImage image = null;
 		try {
 			// try resource
@@ -41,18 +113,9 @@ public class ImageBlurOpenCL {
 		return image;
 	}
 	
-	public static void blurImage(String imageFilename, int filterKernelSize) {
-		// create context - represents the entire OpenCL environment
-		CLContext context = JavaCL.createBestContext();
-
-		// give some informations about the default device
-		System.out.println("Device specs:");
-		printDeviceInfos(context.getDevices()[0]);
-		System.out.println();
-
-		// create command queue for the first device, want to do some profiling
-		CLQueue queue = context.createDefaultProfilingQueue();
-
+	public void blurImage(String imageFilename, int filterKernelSize) {
+		assert(queue != null && device != null);
+		
 		// load image
 		BufferedImage inputImage = loadImage(imageFilename);
 
@@ -109,28 +172,24 @@ public class ImageBlurOpenCL {
 			e.printStackTrace();
 		}
 
-		// output time stats
+		// output time statistics
 		double totalDeviceComputationTimeMS_withSync = 
 				(double) (convolutionEventY.getProfilingCommandEnd() - convolutionEventX.getProfilingCommandStart()) / 1000.0 / 1000.0;
 		System.out.println();
-		System.out.println("Total computation time on device + sync (ms):\t " + totalDeviceComputationTimeMS_withSync);
+		double horizontalConvolutionDeviceComputationTimeMS = 
+				(double) (convolutionEventX.getProfilingCommandEnd() - convolutionEventX.getProfilingCommandStart()) / 1000.0 / 1000.0;
+		System.out.println("Computation time on device convolution horizontal (ms):\t " + horizontalConvolutionDeviceComputationTimeMS);
+		System.out.println("Total computation time on device + intersync (ms):\t " + totalDeviceComputationTimeMS_withSync);
 		System.out.println("Total time including up and download to device (ms):\t " +
 						 (double) (javaNanoTimerEnd - javaNanoTimerStart) / 1000.0 / 1000.);
 		System.out.println();
-
-		// no significant difference!
-		// double totalDeviceComputationTimeMS =
-		// ((double)(convolutionEventX.getProfilingCommandEnd() -
-		// convolutionEventX.getProfilingCommandStart()) +
-		// (double)(convolutionEventY.getProfilingCommandEnd() -
-		// convolutionEventY.getProfilingCommandStart())) / 1000.0 / 1000.0;
-		// System.out.println("Total compution time on device): " +
-		// totalDeviceComputationTimeMS);
-
+		
 		System.out.println("all done.");
 	}
+	
 
 	public static void main(String[] args) {
+		// parse command arguments
 		String imageFilename = "sampleimage1.png";
 		int filterKernelSize = 23; // should be uneven!
 		if (args.length >= 1)
@@ -138,6 +197,36 @@ public class ImageBlurOpenCL {
 		if (args.length >= 2)
 			filterKernelSize = Integer.parseInt(args[1]);
 
-		blurImage(imageFilename, filterKernelSize);
+		// console input
+		Scanner consoleIn = new Scanner(System.in);
+		
+		
+		// choose platform
+		listOpenCLPlatforms();
+		System.out.println("Please choose a platform: ");
+		int platformIndex = consoleIn.nextInt();
+		System.out.println();
+		
+		// choose device
+		listOpenCLDevices(platformIndex);
+		System.out.println("Please choose a device: ");
+		int deviceIndex = consoleIn.nextInt();
+		System.out.println();
+		
+		// create OpenCL context
+		ImageBlurOpenCL imageBlur = new ImageBlurOpenCL(platformIndex, deviceIndex);
+		System.out.println(".. created openCL context successfully..");
+		
+		// print some device infos
+		System.out.println();
+		imageBlur.printCurrentDeviceInfos();
+		System.out.println();
+		
+		// do the job
+		imageBlur.blurImage(imageFilename, filterKernelSize);
+		
+		
+		// close console input
+		consoleIn.close();
 	}
 }
