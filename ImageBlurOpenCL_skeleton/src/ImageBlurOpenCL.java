@@ -14,63 +14,35 @@ import org.bridj.Pointer;
 public class ImageBlurOpenCL {
 	
 	/**
-	 *  Create context - represents the entire OpenCL environment.
-	 */
-	private CLContext context;
-	
-	/**
-	 * OpenCL device used for OpenCL Kernels.
-	 */
-	private CLDevice device;
-	
-	/**
-	 * OpenCL command queue for the choosen device.
-	 */
-	private CLQueue queue;
-	
-	
-	/**
 	 * Initializes CLContext and creates command queue
 	 */
 	public ImageBlurOpenCL(int platformIndex, int deviceIndex) {
-		CLPlatform platform = JavaCL.listPlatforms()[platformIndex];
-		device = platform.listAllDevices(false)[deviceIndex];
-		context = platform.createContext(null, device);
-		queue = device.createProfilingQueue(context);
 	}
 	
 	/**
 	 * Lists all available OpenCL platforms
 	 */
 	public static void listOpenCLPlatforms() {
-		CLPlatform[] platforms = JavaCL.listPlatforms();
-		for(int i=0; i<platforms.length; ++i) {
-			System.out.println("(" + i + ") " + platforms[i].getName());
-		}
 	}
 	
 	/**
 	 * Lists all available OpenCL devices for the current platform.
 	 */
 	public static void listOpenCLDevices(int platformIndex) {
-		CLDevice[] devices = JavaCL.listPlatforms()[platformIndex].listAllDevices(true);
-		for(int i=0; i<devices.length; ++i) {
-			System.out.println("(" + i + ") " + devices[i].getName());
-		}
 	}
 	
 	/**
 	 * Prints various informations of the current device to console.
 	 */
 	public void printCurrentDeviceInfos() {
-		System.out.println("Device Name: " + device.getName());
+/*		System.out.println("Device Name: " + device.getName());
 		System.out.println("OpenCL Version: " + device.getOpenCLVersion());
 		System.out.println("Local Memory size: " + device.getLocalMemSize());
 		System.out.println("Global Memory size: " + device.getGlobalMemSize());
 		System.out.println("Global Memory Cache size: " + device.getGlobalMemCacheSize());
 		System.out.println("Max Compute units: " + device.getMaxComputeUnits()); 
 		System.out.println("Max Work Group size: " + device.getMaxWorkGroupSize());
-		System.out.println("Max Image size: " + device.getImage2DMaxWidth() + "x" + device.getImage2DMaxHeight());
+		System.out.println("Max Image size: " + device.getImage2DMaxWidth() + "x" + device.getImage2DMaxHeight()); */
 	}
 
 	
@@ -100,15 +72,12 @@ public class ImageBlurOpenCL {
 	}
 	
 	public void blurImage(String imageFilename, int filterKernelSize) {
-		assert(queue != null && device != null);
 		
 		// load image
 		BufferedImage inputImage = loadImage(imageFilename);
 
-		// create filter kernel
-		Pointer<Float> filterKernelHost = MathHelper.createNormalDistributionFilterKernel(filterKernelSize);
-		CLBuffer<Float> filterKernelDevice = context.createBuffer(Usage.Input, filterKernelHost);
-
+		// TODO: create filter kernel as constant buffer
+		
 		// read the program sources and compile them :
 		String src = null;
 		try {
@@ -116,41 +85,19 @@ public class ImageBlurOpenCL {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		CLProgram program = context.createProgram(src);
+		// TODO: create program
 
 		// java local timer
 		long javaNanoTimerStart = System.nanoTime();
 
-		// create image on device and copy data
-		CLImage2D deviceImage0 = context.createImage2D(Usage.InputOutput, inputImage, false);
-		// create image on device for output
-		CLImage2D deviceImage1 = context.createImage2D(Usage.InputOutput, deviceImage0.getFormat(), inputImage.getWidth(), inputImage.getHeight());
-
-		System.out.println("Device ImageFormat: " + deviceImage0.getFormat());
-
-		// work size
-		int[] imageDimension = new int[] { inputImage.getWidth(), inputImage.getHeight() };
-		int[] localWorkSize = new int[] { 16, 16 };
-		int[] globalWorkSize = new int[] {
-				(int) (localWorkSize[0] * Math.ceil((float) imageDimension[0] / localWorkSize[0])),
-				(int) (localWorkSize[1] * Math.ceil((float) imageDimension[1] / localWorkSize[1])) };
-
-		// convolve X
-		CLKernel convolveKernelX = program.createKernel("convolveX");
-		convolveKernelX.setArgs(deviceImage0, deviceImage1, filterKernelDevice, filterKernelSize, imageDimension);
-		CLEvent convolutionEventX = convolveKernelX.enqueueNDRange(queue, globalWorkSize, localWorkSize); // call
-
-		// convolve Y
-		CLKernel convolveKernelY = program.createKernel("convolveY");
-		convolveKernelY.setArgs(deviceImage1, deviceImage0, filterKernelDevice, filterKernelSize, imageDimension);
-		CLEvent convolutionEventY = convolveKernelY.enqueueNDRange(queue, globalWorkSize, localWorkSize, convolutionEventX); // call - with wait!
-
-		// read image (will block until computation is finished)
-		BufferedImage outputImage = deviceImage0.read(queue, convolutionEventY);
+		// TODO: create data, some computation
+	
+		// TODO: read image back (will block until computation is finished)
+		
 		long javaNanoTimerEnd = System.nanoTime();
 
 		// write to file
-		System.out.println("Writing image to file...");
+/*		System.out.println("Writing image to file...");
 		try {
 			File outputFile = new File(imageFilename.substring(0, imageFilename.lastIndexOf('.')) + "_convolved.png");
 			ImageIO.write(outputImage, "png", outputFile);
@@ -169,6 +116,7 @@ public class ImageBlurOpenCL {
 		System.out.println("Total time including up and download to device (ms):\t " +
 						 (double) (javaNanoTimerEnd - javaNanoTimerStart) / 1000.0 / 1000.);
 		System.out.println();
+		*/
 		
 		System.out.println("all done.");
 	}

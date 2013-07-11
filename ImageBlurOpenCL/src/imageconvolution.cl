@@ -1,6 +1,6 @@
 __constant sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 
-__kernel void convolveX(
+__kernel void convolveY(
 	read_only image2d_t inputImage,
 	write_only image2d_t outputImage,
 	__constant float* filterKernel,
@@ -22,7 +22,7 @@ __kernel void convolveX(
   	write_imagef(outputImage, pos, (float4)(outputColor, 1.0));
 }
 
-__kernel void convolveY(
+__kernel void convolveX(
 	read_only image2d_t inputImage,
 	write_only image2d_t outputImage,
 	__constant float* filterKernel,
